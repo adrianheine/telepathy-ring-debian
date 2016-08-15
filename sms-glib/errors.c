@@ -22,7 +22,7 @@
 #include "config.h"
 
 #include <sms-glib/errors.h>
-#include <glib/gstrfuncs.h>
+#include <glib.h>
 
 #include <stdarg.h>
 
