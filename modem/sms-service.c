@@ -22,7 +22,7 @@
 
 #include "config.h"
 
-#define MODEM_DEBUG_FLAG MODEM_SERVICE_SMS
+#define MODEM_DEBUG_FLAG MODEM_LOG_SMS
 
 #include "debug.h"
 
@@ -30,8 +30,10 @@
 #include "modem/request-private.h"
 #include "modem/errors.h"
 
+#if nomore
 #include "sms-glib/deliver.h"
 #include "sms-glib/status-report.h"
+#endif
 
 #include "modem/ofono.h"
 
@@ -54,10 +56,14 @@ G_DEFINE_TYPE (ModemSMSService, modem_sms_service, MODEM_TYPE_OFACE)
 /* Signals we emit */
 enum
 {
+  SIGNAL_INCOMING_MESSAGE,
+  SIGNAL_IMMEDIATE_MESSAGE,
+#if nomore
   SIGNAL_DELIVER,
   SIGNAL_OUTGOING_COMPLETE,
   SIGNAL_OUTGOING_ERROR,
   SIGNAL_STATUS_REPORT,
+#endif
   N_SIGNALS
 };
 
@@ -82,20 +88,25 @@ struct _ModemSMSServicePrivate
   char *smsc;
   guint validity_period;
 
+#if nomore
   char **content_types;
 
   GHashTable *received;
+#endif
 
   unsigned reduced_charset:1;
-  unsigned loopback:1;
   unsigned signals:1, :0;
 };
 
 /* ------------------------------------------------------------------------ */
 
+#if nomore
 static void modem_sms_incoming_deliver (ModemSMSService *self,
     SMSGDeliver *deliver);
+#endif
+
 static void on_incoming_message (DBusGProxy *, char const *, GHashTable *, gpointer);
+static void on_immediate_message (DBusGProxy *, char const *, GHashTable *, gpointer);
 static void on_manager_message_added (DBusGProxy *, char const *, GHashTable *,
     gpointer);
 static void on_manager_message_removed (DBusGProxy *, char const *, gpointer);
@@ -111,9 +122,11 @@ modem_sms_service_init (ModemSMSService *self)
   self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self,
       MODEM_TYPE_SMS_SERVICE, ModemSMSServicePrivate);
 
+#if nomore
   self->priv->received = g_hash_table_new_full (g_str_hash, g_str_equal,
       NULL, /* Message object stored in hash owns the key */
       g_object_unref);
+#endif
 }
 
 static void
@@ -127,9 +140,11 @@ modem_sms_service_get_property (GObject *object,
 
   switch (property_id)
     {
+#if nomore
     case PROP_CONTENT_TYPES:
       g_value_set_boxed (value, priv->content_types);
       break;
+#endif
 
     case PROP_SMSC:
       g_value_set_string (value, priv->smsc);
@@ -161,11 +176,13 @@ modem_sms_service_set_property (GObject *object,
 
   switch (property_id)
     {
+#if nomore
     case PROP_CONTENT_TYPES:
       old = priv->content_types;
       priv->content_types = g_value_dup_boxed (value);
       if (old) g_boxed_free (G_TYPE_STRV, old);
       break;
+#endif
 
     case PROP_SMSC:
       old = priv->smsc;
@@ -215,11 +232,13 @@ modem_sms_service_finalize (GObject *object)
   /* Free any data held directly by the object here */
   g_free (priv->smsc);
 
+#if nomore
   if (priv->content_types)
     g_boxed_free (G_TYPE_STRV, priv->content_types);
 
   if (priv->received)
     g_hash_table_destroy (priv->received);
+#endif
 
   G_OBJECT_CLASS (modem_sms_service_parent_class)->finalize (object);
 }
@@ -261,10 +280,7 @@ modem_sms_service_connect (ModemOface *_self)
     dbus_g_proxy_add_signal (proxy, (name), ##signature); \
     dbus_g_proxy_connect_signal (proxy, (name), G_CALLBACK (handler), self, NULL)
 
-      /* XXX: SMS class 0. Does Ofono actually need a separate
-       * signal for them instead of providing the class in the
-       * properties dict? */
-      CONNECT (on_incoming_message, "ImmediateMessage",
+      CONNECT (on_immediate_message, "ImmediateMessage",
           G_TYPE_STRING, MODEM_TYPE_DBUS_DICT, G_TYPE_INVALID);
 
       CONNECT (on_incoming_message, "IncomingMessage",
@@ -320,16 +336,19 @@ modem_sms_service_connected (ModemOface *_self)
   ModemSMSService *self = MODEM_SMS_SERVICE (_self);
   ModemSMSServicePrivate *priv = self->priv;
   time_t now = time (NULL);
-  GHashTableIter i[1];
-  gpointer key, value;
 
   priv->connected = now;
+
+#if nomore
+  GHashTableIter i[1];
+  gpointer key, value;
 
   for (g_hash_table_iter_init (i, priv->received);
        g_hash_table_iter_next (i, &key, &value);)
     {
       g_object_set (value, "time-delivered", (guint64)now, NULL);
     }
+#endif
 }
 
 static void
@@ -346,7 +365,7 @@ modem_sms_service_disconnect (ModemOface *_self)
       priv->signals = FALSE;
 
       dbus_g_proxy_disconnect_signal (proxy, "IncomingMessage",
-          G_CALLBACK (on_incoming_message), self);
+          G_CALLBACK (on_immediate_message), self);
       dbus_g_proxy_disconnect_signal (proxy, "ImmediateMessage",
           G_CALLBACK (on_incoming_message), self);
       dbus_g_proxy_disconnect_signal (proxy, "MessageAdded",
@@ -355,7 +374,9 @@ modem_sms_service_disconnect (ModemOface *_self)
           G_CALLBACK (on_manager_message_removed), self);
     }
 
+#if nomore
   g_hash_table_remove_all (priv->received);
+#endif
 
   modem_oface_disconnect_properties (_self);
 }
@@ -375,11 +396,13 @@ modem_sms_service_class_init (ModemSMSServiceClass *klass)
   object_class->dispose = modem_sms_service_dispose;
   object_class->finalize = modem_sms_service_finalize;
 
+  oface_class->ofono_interface = MODEM_OFACE_SMS;
   oface_class->property_mapper = modem_sms_service_property_mapper;
   oface_class->connect = modem_sms_service_connect;
   oface_class->connected = modem_sms_service_connected;
   oface_class->disconnect = modem_sms_service_disconnect;
 
+#if nomore
   g_object_class_install_property (object_class, PROP_CONTENT_TYPES,
       g_param_spec_boxed ("content-types",
           "Content types used",
@@ -387,6 +410,7 @@ modem_sms_service_class_init (ModemSMSServiceClass *klass)
           G_TYPE_STRV,
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT |
           G_PARAM_STATIC_STRINGS));
+#endif
 
   g_object_class_install_property (object_class, PROP_SMSC,
       g_param_spec_string ("service-centre",
@@ -417,6 +441,27 @@ modem_sms_service_class_init (ModemSMSServiceClass *klass)
           G_PARAM_READWRITE | G_PARAM_CONSTRUCT |
           G_PARAM_STATIC_STRINGS));
 
+  signals[SIGNAL_IMMEDIATE_MESSAGE] =
+    g_signal_new ("immediate-message",
+        G_OBJECT_CLASS_TYPE (klass),
+        G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+        0,
+        NULL, NULL,
+        _modem__marshal_VOID__STRING_BOXED,
+        G_TYPE_NONE, 2,
+        G_TYPE_STRING, G_TYPE_HASH_TABLE);
+
+  signals[SIGNAL_INCOMING_MESSAGE] =
+    g_signal_new ("incoming-message",
+        G_OBJECT_CLASS_TYPE (klass),
+        G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+        0,
+        NULL, NULL,
+        _modem__marshal_VOID__STRING_BOXED,
+        G_TYPE_NONE, 2,
+        G_TYPE_STRING, G_TYPE_HASH_TABLE);
+
+#if nomore
   signals[SIGNAL_DELIVER] =
     g_signal_new ("deliver",
         G_OBJECT_CLASS_TYPE (klass),
@@ -457,12 +502,15 @@ modem_sms_service_class_init (ModemSMSServiceClass *klass)
         G_TYPE_NONE, 1,
         G_TYPE_OBJECT);
 
+#endif
+
   g_type_class_add_private (klass, sizeof (ModemSMSServicePrivate));
 }
 
 /* ---------------------------------------------------------------------- */
 /* Signal connection helpers */
 
+#if nomore
 gulong
 modem_sms_connect_to_connected (ModemSMSService *self,
                                 ModemSMSConnectedHandler *handler,
@@ -478,6 +526,25 @@ modem_sms_connect_to_deliver (ModemSMSService *self,
 {
   return g_signal_connect (self, "deliver", G_CALLBACK (handler), data);
 }
+#endif
+
+gulong
+modem_sms_connect_to_incoming_message (ModemSMSService *self,
+                                       ModemSMSMessageHandler *handler,
+                                       gpointer data)
+{
+  return g_signal_connect (self, "incoming-message",
+      G_CALLBACK (handler), data);
+}
+
+gulong
+modem_sms_connect_to_immediate_message (ModemSMSService *self,
+                                        ModemSMSMessageHandler *handler,
+                                        gpointer data)
+{
+  return g_signal_connect (self, "immediate-message",
+      G_CALLBACK (handler), data);
+}
 
 /* ------------------------------------------------------------------------- */
 /* modem_sms_service interface */
@@ -490,6 +557,18 @@ modem_sms_service_time_connected (ModemSMSService const *self)
   else
     return 0;
 }
+
+gint64
+modem_sms_parse_time (gchar const *s)
+{
+  struct tm tm = { };
+  char *rest;
+
+  rest = strptime (s, "%Y-%m-%dT%H:%M:%S%z", &tm);
+
+  return (gint64) mktime (&tm);
+}
+
 
 /* ------------------------------------------------------------------------- */
 
@@ -519,6 +598,7 @@ on_manager_message_removed (DBusGProxy *proxy,
 }
 
 /* FIXME: something for Ofono... */
+#if nomore
 static char *
 modem_sms_generate_token (void)
 {
@@ -531,6 +611,7 @@ modem_sms_generate_token (void)
 
   return token;
 }
+#endif
 
 static void
 dump_message_dict (GHashTable *dict)
@@ -548,16 +629,16 @@ dump_message_dict (GHashTable *dict)
     }
 }
 
+#if nomore
+
 static void
 on_incoming_message (DBusGProxy *proxy,
                      char const *message,
                      GHashTable *dict,
                      gpointer _self)
 {
-  /* FIXME: ofono does not provide this */
   char const *smsc = "1234567";
   char const *type = "text/plain";
-  char const *mwi_type = "";
   char const *originator = "";
 
   char *token;
@@ -575,12 +656,13 @@ on_incoming_message (DBusGProxy *proxy,
     originator = g_value_get_string (value);
 
   token = modem_sms_generate_token ();
+
   d = sms_g_deliver_incoming (message, token, originator,
-      smsc, type, mwi_type, &error);
+      smsc, type, NULL, &error);
 
   if (!d)
     {
-      modem_message (MODEM_SERVICE_SMS,
+      modem_message (MODEM_LOG_SMS,
           "deserializing SMS-DELIVER \"%s\" failed: "
           GERROR_MSG_FMT, token, GERROR_MSG_CODE (error));
       g_clear_error (&error);
@@ -592,6 +674,8 @@ on_incoming_message (DBusGProxy *proxy,
 
   g_free (token);
 }
+
+#endif
 
 /* ------------------------------------------------------------------------- */
 
@@ -640,6 +724,7 @@ modem_sms_set_srr (ModemSMSService *self,
 /* ---------------------------------------------------------------------- */
 /* Message deliver */
 
+#if nomore
 static void
 modem_sms_incoming_deliver (ModemSMSService *self, SMSGDeliver *deliver)
 {
@@ -678,7 +763,6 @@ modem_sms_incoming_deliver (ModemSMSService *self, SMSGDeliver *deliver)
     g_signal_emit (self, signals[SIGNAL_DELIVER], 0, deliver);
 }
 
-#if nomore
 static void
 modem_sms_incoming_status_report (ModemSMSService *self,
                                   SMSGStatusReport *sr)
@@ -697,6 +781,45 @@ modem_sms_incoming_status_report (ModemSMSService *self,
     g_signal_emit (self, signals[SIGNAL_STATUS_REPORT], 0, sr);
 }
 #endif
+
+static void
+on_immediate_message (DBusGProxy *proxy,
+                      char const *message,
+                      GHashTable *dict,
+                      gpointer _self)
+{
+  ModemSMSService *self = MODEM_SMS_SERVICE (_self);
+  ModemSMSServicePrivate *priv = self->priv;
+
+  if (!priv->connected)
+    return;
+
+  DEBUG ("immediate = \"%50s\"%s", message, strlen (message) > 50 ? "..." : "");
+  dump_message_dict (dict);
+
+  g_signal_emit (self, signals[SIGNAL_IMMEDIATE_MESSAGE], 0,
+      message, dict);
+}
+
+static void
+on_incoming_message (DBusGProxy *proxy,
+                     char const *message,
+                     GHashTable *dict,
+                     gpointer _self)
+{
+  ModemSMSService *self = MODEM_SMS_SERVICE (_self);
+  ModemSMSServicePrivate *priv = self->priv;
+
+  if (!priv->connected)
+    return;
+
+  DEBUG ("incoming = \"%50s\"%s", message, strlen (message) > 50 ? "..." : "");
+  dump_message_dict (dict);
+
+  g_signal_emit (self, signals[SIGNAL_INCOMING_MESSAGE], 0,
+      message, dict);
+}
+
 
 /* ---------------------------------------------------------------------- */
 /* Sending */
@@ -735,7 +858,7 @@ modem_sms_request_send (ModemSMSService *self,
 {
   ModemRequest *request;
 
-  DEBUG (OFONO_IFACE_SMS ".SendMessage (%s,%s)", to, message);
+  DEBUG (MODEM_OFACE_SMS ".SendMessage (%s,%s)", to, message);
 
   request = modem_request (self,
       modem_oface_dbus_proxy (MODEM_OFACE (self)),
@@ -751,8 +874,70 @@ modem_sms_request_send (ModemSMSService *self,
   return request;
 }
 
-/* ---------------------------------------------------------------------- */
-/* Handler interface */
+static gchar const *
+_modem_sms_is_valid_address (gchar const *address)
+{
+  size_t len;
 
-/* ---------------------------------------------------------------------- */
-/* Error handling */
+  if (address == NULL)
+    return "NULL";
+
+  if (address[0] == '+')
+    {
+      address++;
+    }
+
+  len = strspn (address, "0123456789");
+
+  if (address[len])
+    return "invalid character";
+
+  if (len == 0)
+    return "too short";
+
+  if (len > 20)
+    return "too long";
+
+  return NULL;
+}
+
+/** Return TRUE if @a address is a valid SMS address.
+ *
+ * A valid SMS address is a phone number with at most 20 digits either in
+ * national or in international format (starting with +).
+ *
+ * @param address - ISDN address of address
+ *
+ * @retval TRUE - address is a valid SMS address
+ * @retval FALSE - address is NULL, does not contain valid phone number, or it
+ * is too long.
+ */
+gboolean
+modem_sms_is_valid_address (gchar const *address)
+{
+  return !_modem_sms_is_valid_address (address);
+}
+
+/** Validate a SMS address @a address.
+ *
+ * A valid SMS address is a phone number with at most 20 digits either
+ * in national or in international format (starting with +).
+ *
+ * @param address - ISDN address of address
+ * @param error - return value for GError describing the validation error
+ *
+ * @retval TRUE - address is a valid SMS address
+ * @retval FALSE - address is NULL, does not contain valid phone number, or it
+ * is too long.
+ */
+gboolean
+modem_sms_validate_address (gchar const *address, GError **error)
+{
+  gchar const *reason = _modem_sms_is_valid_address (address);
+
+  if (reason)
+    g_set_error (error, MODEM_SMS_ERRORS, MODEM_SMS_ERROR_INVALID_PARAMETER,
+      "Invalid SMS address \"%s\": %s", address, reason);
+
+  return !reason;
+}

@@ -25,9 +25,7 @@
 #include <glib-object.h>
 #include <telepathy-glib/dbus-properties-mixin.h>
 #include <telepathy-glib/message-mixin.h>
-
-#include <sms-glib/deliver.h>
-#include <sms-glib/status-report.h>
+#include <telepathy-glib/base-channel.h>
 
 G_BEGIN_DECLS
 
@@ -36,12 +34,13 @@ typedef struct _RingTextChannelClass RingTextChannelClass;
 typedef struct _RingTextChannelPrivate RingTextChannelPrivate;
 
 struct _RingTextChannelClass {
-  GObjectClass parent_class;
+  TpBaseChannelClass parent_class;
   TpDBusPropertiesMixinClass dbus_properties_class;
 };
 
 struct _RingTextChannel {
-  GObject parent;
+  TpBaseChannel parent;
+
   TpMessageMixin message;
 
   RingTextChannelPrivate *priv;
@@ -67,10 +66,22 @@ GType ring_text_channel_get_type (void);
 
 char *ring_text_channel_destination(char const *inspection);
 
+#if nomore
+
 /* FIXME: the gpointers are temporary hacks */
 gboolean ring_text_channel_can_handle(gpointer);
 void ring_text_channel_receive_deliver(RingTextChannel *, gpointer);
+
 void ring_text_channel_receive_status_report(RingTextChannel *, gpointer);
+
+#endif
+
+void ring_text_channel_receive_text (RingTextChannel *self,
+    gchar const *message_token,
+    gchar const *message,
+    gint64 message_sent,
+    gint64 message_received,
+    guint32 sms_class);
 
 void ring_text_channel_outgoing_sms_complete(RingTextChannel *,
   char const *token);

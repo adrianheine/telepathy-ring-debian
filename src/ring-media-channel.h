@@ -23,8 +23,11 @@
 #define RING_MEDIA_CHANNEL_H
 
 #include <glib-object.h>
-#include <telepathy-glib/group-mixin.h>
+
+#include <telepathy-glib/base-channel.h>
 #include <telepathy-glib/dbus-properties-mixin.h>
+#include <telepathy-glib/svc-channel.h>
+#include <ring-streamed-media-mixin.h>
 
 G_BEGIN_DECLS
 
@@ -41,26 +44,23 @@ G_END_DECLS
 G_BEGIN_DECLS
 
 struct _RingMediaChannelClass {
-  GObjectClass parent_class;
-  TpDBusPropertiesMixinClass dbus_properties_class;
+  TpBaseChannelClass parent_class;
+
+  RingStreamedMediaMixinClass streamed_media_class;
 
   void (*emit_initial)(RingMediaChannel *self);
   void (*update_state)(RingMediaChannel *self, guint status, guint causetype, guint cause);
   gboolean (*close)(RingMediaChannel *, gboolean immediately);
   void (*set_call_instance)(RingMediaChannel *self, ModemCall *ci);
-  gboolean (*validate_media_handle)(RingMediaChannel *, guint *, GError **);
-  gboolean (*create_streams)(RingMediaChannel *,
-    guint handle, gboolean audio, gboolean video,
-    GError **);
 };
 
 struct _RingMediaChannel {
-  GObject parent;
+  TpBaseChannel parent;
+  RingStreamedMediaMixin streamed_media;
+
   /* Read-only */
-  RingConnection *connection;
-  ModemCallService *call_service;
   ModemCall *call_instance;
-  char const *nick;
+  char *nick;
 
   RingMediaChannelPrivate *priv;
 };
@@ -100,6 +100,8 @@ void ring_media_channel_emit_initial(RingMediaChannel *self);
 
 void ring_media_channel_close(RingMediaChannel *self);
 
+ModemCallService *ring_media_channel_get_call_service (RingMediaChannel *);
+
 ModemRequest *ring_media_channel_queue_request(RingMediaChannel *self,
   ModemRequest *request);
 
@@ -127,7 +129,13 @@ void ring_media_channel_set_state(RingMediaChannel *self,
   guint causetype,
   guint cause);
 
-GHashTable *ring_media_channel_properties(RingMediaChannel *self);
+void ring_media_channel_dtmf_start_tone(TpSvcChannelInterfaceDTMF *iface,
+  guint stream_id,
+  guchar event,
+    DBusGMethodInvocation *context);
+void ring_media_channel_dtmf_stop_tone(TpSvcChannelInterfaceDTMF *iface,
+  guint stream_id,
+    DBusGMethodInvocation *context);
 
 G_END_DECLS
 

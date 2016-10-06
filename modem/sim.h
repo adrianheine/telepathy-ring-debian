@@ -63,6 +63,10 @@ GType modem_sim_service_get_type (void);
   (G_TYPE_INSTANCE_GET_CLASS ((obj),                    \
       MODEM_TYPE_SIM_SERVICE, ModemSIMServiceClass))
 
+/* ---------------------------------------------------------------------- */
+
+#define MODEM_OFACE_SIM "org.ofono.SimManager"
+
 enum _ModemSIMState
 {
   MODEM_SIM_STATE_UNKNOWN     = 0,
@@ -77,8 +81,6 @@ enum _ModemSIMState
   MODEM_SIM_STATE_REJECTED,
   LAST_MODEM_SIM_STATE
 };
-
-/* ---------------------------------------------------------------------- */
 
 typedef void ModemSIMStringReply (ModemSIMService *self,
     ModemRequest *request,
