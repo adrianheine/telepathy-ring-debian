@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2007-2010 Nokia Corporation
  *   @author Pekka Pessi <first.surname@nokia.com>
+ * @author Tom Swindell <t.swindell@rubyx.co.uk>
  *
  * This work is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -29,6 +30,7 @@
 #include <telepathy-glib/base-connection.h>
 #include <telepathy-glib/dbus-properties-mixin.h>
 #include <telepathy-glib/group-mixin.h>
+#include <telepathy-glib/interfaces.h>
 
 #include <string.h>
 
@@ -211,15 +213,25 @@ ring_properties_satisfy(GHashTable *requested_properties,
       DEBUG("*** expecting %u for %s, got %u",
         g_value_get_boolean(fixed), (char *)keyp, g_value_get_boolean(requested));
     }
-    else if (G_VALUE_HOLDS(requested, G_TYPE_STRING)) {
-      if (!tp_strdiff(g_value_get_string(fixed), g_value_get_string(requested)))
-        continue;
-      DEBUG("*** expecting \"%s\" for %s, got \"%s\"",
-        g_value_get_string(fixed), (char *)keyp, g_value_get_string(requested));
-    }
-    else {
-      g_warning("*** fixed-properties contains %s ***", G_VALUE_TYPE_NAME(fixed));
-    }
+    else if (G_VALUE_HOLDS (requested, G_TYPE_STRING))
+      {
+        char const *fixed_string = g_value_get_string (fixed);
+        char const *requested_string = g_value_get_string (requested);
+
+        if (!tp_strdiff (fixed_string, requested_string))
+          continue;
+
+        if (tp_strdiff (keyp, "org.freedesktop.Telepathy.Channel.ChannelType"))
+          {
+            DEBUG ("*** expecting \"%s\" for %s, got \"%s\"",
+                fixed_string, (char *)keyp, requested_string);
+          }
+      }
+    else
+      {
+        g_warning ("*** fixed-properties contains %s ***",
+            G_VALUE_TYPE_NAME (fixed));
+      }
 
     return 0;
   }
@@ -465,3 +477,31 @@ ring_channel_group_error_reason(GError *error)
 
   return TP_CHANNEL_GROUP_CHANGE_REASON_ERROR;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Initial media stuff */
+
+gboolean
+tp_asv_get_initial_audio (GHashTable *properties, gboolean default_value)
+{
+  GValue *value = g_hash_table_lookup (properties,
+                  TP_IFACE_CHANNEL_TYPE_STREAMED_MEDIA ".InitialAudio");
+
+  if (value && G_VALUE_HOLDS_BOOLEAN (value))
+    return g_value_get_boolean (value);
+  else
+    return default_value;
+}
+
+gboolean
+tp_asv_get_initial_video (GHashTable *properties, gboolean default_value)
+{
+  GValue *value = g_hash_table_lookup (properties,
+      TP_IFACE_CHANNEL_TYPE_STREAMED_MEDIA ".InitialVideo");
+
+  if (value && G_VALUE_HOLDS_BOOLEAN (value))
+    return g_value_get_boolean (value);
+  else
+    return default_value;
+}
+

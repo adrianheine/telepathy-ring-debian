@@ -24,21 +24,20 @@
 
 #include <glib-object.h>
 
+#if nomore
+#include <sms-glib/deliver.h>
+#include <sms-glib/status-report.h>
+#include <sms-glib/submit.h>
+#endif
+
+#include <modem/request.h>
+#include <modem/oface.h>
+
 G_BEGIN_DECLS
 
 typedef struct _ModemSMSService ModemSMSService;
 typedef struct _ModemSMSServiceClass ModemSMSServiceClass;
 typedef struct _ModemSMSServicePrivate ModemSMSServicePrivate;
-
-G_END_DECLS
-
-#include <sms-glib/deliver.h>
-#include <sms-glib/status-report.h>
-#include <sms-glib/submit.h>
-#include <modem/request.h>
-#include <modem/oface.h>
-
-G_BEGIN_DECLS
 
 struct _ModemSMSServiceClass
 {
@@ -69,9 +68,18 @@ GType modem_sms_service_get_type (void);
 
 /* ---------------------------------------------------------------------- */
 
+#define MODEM_OFACE_SMS "org.ofono.MessageManager"
+
+#if nomore
 typedef void ModemSMSConnectedHandler (ModemSMSService *, gpointer);
 typedef void ModemSMSDeliverHandler (ModemSMSService *,
     SMSGDeliver *, gpointer);
+#endif
+
+typedef void ModemSMSMessageHandler (ModemSMSService *self,
+    gchar const *message,
+    GHashTable *info,
+    gpointer user_data);
 
 typedef void ModemSMSServiceReply (ModemSMSService *self,
   ModemRequest *request,
@@ -86,6 +94,7 @@ typedef void ModemSMSServiceSendReply (ModemSMSService *self,
 
 /* ---------------------------------------------------------------------- */
 
+#if nomore
 char const *modem_sms_service_property_name_by_ofono_name (char const *);
 
 gulong modem_sms_connect_to_connected (ModemSMSService *self,
@@ -95,8 +104,19 @@ gulong modem_sms_connect_to_connected (ModemSMSService *self,
 gulong modem_sms_connect_to_deliver (ModemSMSService *self,
   ModemSMSDeliverHandler *user_function,
   gpointer user_data);
+#endif
+
+gulong modem_sms_connect_to_incoming_message (ModemSMSService *self,
+    ModemSMSMessageHandler *handler,
+    gpointer data);
+
+gulong modem_sms_connect_to_immediate_message (ModemSMSService *self,
+    ModemSMSMessageHandler *handler,
+    gpointer data);
 
 guint64 modem_sms_service_time_connected (ModemSMSService const *self);
+
+gint64 modem_sms_parse_time (gchar const *);
 
 /* ---------------------------------------------------------------------- */
 
@@ -116,6 +136,9 @@ ModemRequest *modem_sms_request_send (ModemSMSService *self,
   gpointer user_data);
 
 /* ---------------------------------------------------------------------- */
+
+gboolean modem_sms_is_valid_address (gchar const *address);
+gboolean modem_sms_validate_address (gchar const *address, GError **error);
 
 G_END_DECLS
 

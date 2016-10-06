@@ -22,7 +22,7 @@
 
 #include "config.h"
 
-#define MODEM_DEBUG_FLAG MODEM_SERVICE_SIM
+#define MODEM_DEBUG_FLAG MODEM_LOG_SIM
 
 #include "debug.h"
 
@@ -259,6 +259,7 @@ modem_sim_service_class_init (ModemSIMServiceClass *klass)
   object_class->dispose = modem_sim_service_dispose;
   object_class->finalize = modem_sim_service_finalize;
 
+  oface_class->ofono_interface = MODEM_OFACE_SIM;
   oface_class->property_mapper = modem_sim_service_property_mapper;
   oface_class->connect = modem_sim_service_connect;
   oface_class->connected = modem_sim_service_connected;

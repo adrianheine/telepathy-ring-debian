@@ -47,14 +47,12 @@ static void teardown(void)
 
 START_TEST(modem_call_properties)
 {
-  DBusGProxy *proxy = modem_ofono_proxy("/path", "org.ofono.VoiceCall");
   ModemCall *ci = g_object_new(MODEM_TYPE_CALL,
+      "object-path", "/path",
       "call-service", NULL,
-      "dbus-proxy", proxy,
       NULL);
 
   ModemCallService *client = (gpointer)-1;
-  gpointer dbus_proxy = (gpointer)-1;
   char *remote = (gpointer)-1;
   char *emergency = (gpointer)-1;
   unsigned state = (unsigned)-1;
@@ -63,18 +61,16 @@ START_TEST(modem_call_properties)
 
   g_object_get(ci,
       "call-service", &client,
-      "dbus-proxy", &dbus_proxy,
       "remote", &remote,
       "state", &state,
       "originating", &originating,
       "terminating", &terminating,
       "emergency", &emergency,
       "onhold", &onhold,
-      "member", &member,
+      "multiparty", &member,
     NULL);
 
   fail_if(client == (gpointer)-1);
-  fail_if(dbus_proxy == (gpointer)-1);
   fail_if(remote == (gpointer)-1);
   fail_if(state == (unsigned)-1);
   fail_if(originating == (gboolean)-1);
@@ -84,7 +80,6 @@ START_TEST(modem_call_properties)
   fail_if(member == (gboolean)-1);
 
   fail_unless(client == NULL);
-  fail_unless(dbus_proxy == proxy);
   fail_unless(remote == NULL);
   fail_unless(state == MODEM_CALL_STATE_INVALID);
   fail_unless(originating == FALSE);
@@ -93,7 +88,6 @@ START_TEST(modem_call_properties)
   fail_unless(onhold == FALSE);
   fail_unless(member == FALSE);
 
-  g_object_unref(dbus_proxy);
   g_free(remote);
 
 #if XXX
@@ -104,7 +98,7 @@ START_TEST(modem_call_properties)
     "terminating", 0,
     "emergency", "urn:service:sos",
     "onhold", 1,
-    "member", 1,
+    "multiparty", 1,
     NULL);
 
   g_object_get(ci,
@@ -114,7 +108,7 @@ START_TEST(modem_call_properties)
     "terminating", &terminating,
     "emergency", &emergency,
     "onhold", &onhold,
-    "member", &member,
+    "multiparty", &member,
     NULL);
 
   fail_unless(remote && strcmp(remote, "99001") == 0);

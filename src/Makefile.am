@@ -33,7 +33,6 @@ test_ring_SOURCES = tests/test-ring.h tests/test-ring.c tests/test-ring-util.c
 test_ring_LDADD = \
 	libtpring.la $(TP_EXTLIB) \
 	../modem/libmodem-glib.la \
-	../sms-glib/libsms-glib.la \
 	../tests/libtestcommon.la \
 	@TP_LIBS@ @DBUS_LIBS@ @GLIB_LIBS@ \
 	@CHECK_LIBS@ -lpthread
@@ -42,6 +41,10 @@ test_ring_LDADD = \
 # Rules for building the targets
 
 libtpring_la_SOURCES = \
+    base-call-channel.h base-call-channel.c \
+    ring-call-content.h ring-call-content.c \
+    ring-call-stream.h ring-call-stream.c \
+    ring-call-member.h ring-call-member.c \
     ring-connection-manager.h ring-connection-manager.c \
     ring-protocol.h ring-protocol.c \
     ring-connection.h ring-connection.c \
@@ -51,11 +54,14 @@ libtpring_la_SOURCES = \
     ring-media-manager.h ring-media-manager.c \
     ring-media-channel.h ring-media-channel.c \
     ring-call-channel.h ring-call-channel.c \
+    ring-streamed-media-mixin.h ring-streamed-media-mixin.c \
     ring-member-channel.h ring-member-channel.c \
+    ring-conference-manager.h ring-conference-manager.c \
     ring-conference-channel.h ring-conference-channel.c \
     ring-param-spec.h ring-param-spec.c \
     ring-emergency-service.h ring-emergency-service.c \
-    ring-util.h ring-util.c
+    ring-util.h ring-util.c \
+    util.h util.c
 
 TP_EXTLIB =
 TP_EXTLIB += $(top_builddir)/ring-extensions/libtpextensions.a
@@ -63,7 +69,6 @@ TP_EXTLIB += $(top_builddir)/ring-extensions/libtpextensions.a
 telepathy_ring_LDADD = \
 	libtpring.la $(TP_EXTLIB) \
 	../modem/libmodem-glib.la \
-	../sms-glib/libsms-glib.la \
 	@TP_LIBS@ @DBUS_LIBS@ @GLIB_LIBS@ \
 	-lpthread
 

@@ -58,12 +58,15 @@ GType modem_get_type (void);
 
 /* ---------------------------------------------------------------------- */
 
+#define MODEM_OFACE_MODEM "org.ofono.Modem"
+
 char const *modem_get_modem_path (Modem const *self);
 
 gboolean modem_is_powered (Modem const *self);
 gboolean modem_is_online (Modem const *self);
 gboolean modem_has_interface (Modem const *self, char const *interface);
 
+ModemOface *modem_get_interface (Modem const *self, char const *interface);
 ModemOface **modem_list_interfaces (Modem const *self);
 
 gboolean modem_supports_sim (Modem const *self);
